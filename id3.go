@@ -132,6 +132,7 @@ func BestFeatureInformationGain(ds ClassifiedDataSet) string {
 	}
 	return greatestFeature
 }
+
 var _ BestFeatureFunc = BestFeatureInformationGain
 
 func infoGainOfFeature(ds ClassifiedDataSet, featureName string) float64 {

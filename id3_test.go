@@ -2,6 +2,7 @@ package id3
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -15,11 +16,27 @@ func TestCandy(t *testing.T) {
 			{map[string]Feature{"salty": false, "sweet": true}, true},   // Sugary
 		},
 	}
+
+	var expectedTree = &Decision{
+		featureName: "sweet",
+		nextDecisions: map[Feature]*Decision{
+			true: {
+				isOutput:    true,
+				outputValue: true,
+			},
+			false: {
+				isOutput:    true,
+				outputValue: false,
+			},
+		},
+	}
+
 	dtree, err := Train(testDataset, BestFeatureInformationGain)
+
 	if err != nil {
-		fmt.Printf("%v\n", err)
-	} else {
-		printDecisionTree(dtree)
+		t.Error("Encountered tree training error", err)
+	} else if !reflect.DeepEqual(expectedTree, dtree) {
+		t.Error("Expected", expectedTree, "got", dtree)
 	}
 }
 
