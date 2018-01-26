@@ -6,27 +6,43 @@ import (
 	"testing"
 )
 
+func btoFeature(f bool) Feature {
+	if f {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+func btoTarget(t bool) Target {
+	if t {
+		return true
+	} else {
+		return false
+	}
+}
+
 func TestCandy(t *testing.T) {
 	// Testing candy for "yumminess"
 	var testDataset = ClassifiedDataSet{
 		[]*Instance{
-			{map[string]Feature{"salty": false, "sweet": false}, false}, // Bland
-			{map[string]Feature{"salty": true, "sweet": false}, false},  // Disgusting
-			{map[string]Feature{"salty": true, "sweet": true}, true},    // Savory
-			{map[string]Feature{"salty": false, "sweet": true}, true},   // Sugary
+			{map[string]Feature{"salty": btoFeature(false), "sweet": btoFeature(false)}, btoTarget(false)}, // Bland
+			{map[string]Feature{"salty": btoFeature(true), "sweet": btoFeature(false)}, btoTarget(false)},  // Disgusting
+			{map[string]Feature{"salty": btoFeature(true), "sweet": btoFeature(true)}, btoTarget(true)},    // Savory
+			{map[string]Feature{"salty": btoFeature(false), "sweet": btoFeature(true)}, btoTarget(true)},   // Sugary
 		},
 	}
 
 	var expectedTree = &Decision{
 		featureName: "sweet",
 		nextDecisions: map[Feature]*Decision{
-			true: {
+			btoFeature(true): {
 				isOutput:    true,
-				outputValue: true,
+				outputValue: btoTarget(true),
 			},
-			false: {
+			btoFeature(false): {
 				isOutput:    true,
-				outputValue: false,
+				outputValue: btoTarget(false),
 			},
 		},
 	}

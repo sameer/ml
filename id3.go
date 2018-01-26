@@ -14,7 +14,7 @@ type Decision struct {
 	outputValue   Target
 }
 
-type Feature bool
+type Feature uint8
 
 type Target bool
 
