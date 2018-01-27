@@ -8,13 +8,20 @@ import (
 	"sort"
 )
 
+// Decision tree node type.
+// If it is not an output node, it keeps track of the name of the feature
+// being used and the child Decisions.
+// if it is an output node, it keeps track of its output value.
 type Decision struct {
+
 	nextDecisions map[Feature]*Decision
 	featureName   string
 	isOutput      bool
 	outputValue   Target
 }
 
+// Convert a decision tree to a sorted string slice of all possible paths to output nodes.
+// Useful for debugging or equality-check purposes.
 func (dtree *Decision) String() []string {
 	paths := dtree.string(nil)
 	sort.Strings(paths)
@@ -55,21 +62,33 @@ func (dtree *Decision) string(parents []*Decision) []string {
 	}
 }
 
+// The type used for decision tree features. Up to 256 discrete values are allowed.
+// The trainer builds the tree assuming that the only possible feature values are those specified
+// in the provided dataset
 type Feature uint8
 
+
+// The type used for decision tree targets, or outputs.
 type Target bool
 
+// A set of pointers to classified data.
 type ClassifiedDataSet struct {
 	Instances []*Instance
 }
 
+// A piece of data. It can be considered classified or unclassified. When used in a ClassifiedDataSet, it should
+// always be classified.
 type Instance struct {
 	FeatureValues map[string]Feature
 	TargetValue   Target
 }
 
+// A type of function that selects the best feature for the decision tree to build upon.
+// One BestFeatureFunc using information gain is provided.
 type BestFeatureFunc func(ds ClassifiedDataSet) string
 
+// Using a classified set of data and the provided BestFeatureFunc, the ID3 algorithm is run to train and return
+// a decision tree.
 func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
 	dtree := &Decision{}
 	if ds.Instances == nil || len(ds.Instances) == 0 {
@@ -104,7 +123,9 @@ func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
 	}
 }
 
-func CalculateError(dtree *Decision, ds ClassifiedDataSet) (float64, error) {
+
+// Calculates the error the provided decision tree encounters in classifying the provided pre-classified dataset.
+func (dtree *Decision) CalculateError(ds ClassifiedDataSet) (float64, error) {
 	var wrongClassifications float64 = 0.0
 	for _, inst := range ds.Instances {
 		correctTargetValue := inst.TargetValue
@@ -118,13 +139,14 @@ func CalculateError(dtree *Decision, ds ClassifiedDataSet) (float64, error) {
 	return wrongClassifications / float64(len(ds.Instances)), nil
 }
 
-func Classify(dtree *Decision, inst *Instance) error {
+// Attempt to classify a provided instance of data. The classification is set in the instance's TargetValue field.
+func (dtree *Decision) Classify(inst *Instance) error {
 	if dtree.isOutput {
 		inst.TargetValue = dtree.outputValue
 		return nil
 	} else if thisValue, ok := inst.FeatureValues[dtree.featureName]; ok {
 		if nextDecision, ok := dtree.nextDecisions[thisValue]; ok {
-			return Classify(nextDecision, inst)
+			return nextDecision.Classify(inst)
 		} else {
 			return errors.New(fmt.Sprint("No decision node corresponding to instance value of", thisValue, "for", dtree.featureName))
 		}
@@ -161,6 +183,7 @@ func mostPopularTarget(insts []*Instance) Target {
 	return highestTarget
 }
 
+// A BestFeature function that uses information gain.
 func BestFeatureInformationGain(ds ClassifiedDataSet) string {
 	var greatestInfoGain float64 = 0.0
 	greatestFeature := ""
