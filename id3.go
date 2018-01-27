@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 )
 
 type Decision struct {
@@ -12,6 +13,46 @@ type Decision struct {
 	featureName   string
 	isOutput      bool
 	outputValue   Target
+}
+
+func (dtree *Decision) String() []string {
+	paths := dtree.string(nil)
+	sort.Strings(paths)
+	return paths
+}
+
+func (dtree *Decision) string(parents []*Decision) []string {
+	if dtree.isOutput {
+		sout := ""
+		for i, parent := range parents {
+			var featureVal Feature
+			var pChild *Decision
+			if i+1 < len(parents) {
+				pChild = parents[i+1]
+			} else {
+				pChild = dtree
+			}
+			for k, v := range parent.nextDecisions {
+				if v == pChild {
+					featureVal = k
+					break
+				}
+			}
+			sout += fmt.Sprintf("%v[%v] ==> ", parent.featureName, featureVal)
+		}
+		sout += fmt.Sprintf("%#v", dtree.outputValue)
+		return []string{sout}
+	} else {
+		sout := []string{}
+		if parents == nil {
+			parents = make([]*Decision, 0)
+		}
+		parents = append(parents, dtree)
+		for _, subtree := range dtree.nextDecisions {
+			sout = append(sout, subtree.string(parents)...)
+		}
+		return sout
+	}
 }
 
 type Feature uint8
@@ -137,17 +178,13 @@ var _ BestFeatureFunc = BestFeatureInformationGain
 
 func infoGainOfFeature(ds ClassifiedDataSet, featureName string) float64 {
 	featureValueCounts := make(map[Feature]int)
-	featureValueInstances := make(map[Feature][]*Instance)
 	for _, inst := range ds.Instances {
 		count, ok := featureValueCounts[inst.FeatureValues[featureName]]
-		insts, _ := featureValueInstances[inst.FeatureValues[featureName]]
 		if !ok {
 			count = 0
-			insts = make([]*Instance, 0)
 		}
 		count++
 		featureValueCounts[inst.FeatureValues[featureName]] = count
-		featureValueInstances[inst.FeatureValues[featureName]] = append(insts, inst)
 	}
 
 	var infoGain float64 = entropy(ds.Instances)
@@ -183,7 +220,7 @@ func entropy(insts []*Instance) float64 {
 	}
 	var H float64 = 0.0
 	for _, count := range targetCounts {
-		pI := float64(count) / float64(len(targetCounts))
+		pI := float64(count) / float64(len(insts))
 		H += pI * math.Log2(pI)
 	}
 	return -H
