@@ -129,7 +129,7 @@ func (dtree *Decision) CalculateError(ds ClassifiedDataSet) (float64, error) {
 	var wrongClassifications float64 = 0.0
 	for _, inst := range ds.Instances {
 		correctTargetValue := inst.TargetValue
-		if err := Classify(dtree, inst); err != nil {
+		if err := dtree.Classify(inst); err != nil {
 			return 1.0, err
 		} else if correctTargetValue != inst.TargetValue {
 			wrongClassifications++
