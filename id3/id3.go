@@ -81,13 +81,12 @@ type Instance struct {
 	TargetValue   Target
 }
 
-
 // Creates a duplicate or clone of an instance.
 func (i *Instance) Clone() *Instance {
 	clone := &Instance{}
 	clone.TargetValue = i.TargetValue
 	clone.FeatureValues = make(map[string]Feature)
-	for k,v := range i.FeatureValues {
+	for k, v := range i.FeatureValues {
 		clone.FeatureValues[k] = v
 	}
 	return clone
@@ -97,13 +96,19 @@ func (i *Instance) Clone() *Instance {
 // One BestFeatureFunc using information gain is provided.
 type BestFeatureFunc func(ds ClassifiedDataSet) string
 
+
 // Using a classified set of data and the provided BestFeatureFunc, the ID3 algorithm is run to train and return
 // a decision tree.
 func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
+	return BoundedTrain(ds, bf, ^uint(0))
+}
+
+// Allows for training with a specified maximum number of iterations
+func BoundedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations uint) (*Decision, error) {
 	dtree := &Decision{}
 	if ds.Instances == nil || len(ds.Instances) == 0 {
 		return nil, errors.New("No instances provided")
-	} else if dtree.featureName = bf(ds); dtree.featureName == "" { // No features left
+	} else if dtree.featureName = bf(ds); iterations == 0 || dtree.featureName == "" { // No features left
 		dtree.outputValue, dtree.isOutput = mostPopularTarget(ds.Instances), true
 		return dtree, nil
 	} else if instancesIdentical(ds.Instances) {
@@ -120,12 +125,12 @@ func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
 			bestFeatureValToInstances[inst.FeatureValues[dtree.featureName]] = append(instances, inst)
 		}
 		ds = ClassifiedDataSet{append([]*Instance{}, ds.Instances...)}
-		for i, _ := range ds.Instances {
+		for i := range ds.Instances {
 			ds.Instances[i] = ds.Instances[i].Clone()
 		}
 		for k, v := range bestFeatureValToInstances {
 			var err error
-			dtree.nextDecisions[k], err = Train(ClassifiedDataSet{Instances: v}, bf)
+			dtree.nextDecisions[k], err = BoundedTrain(ClassifiedDataSet{Instances: v}, bf, iterations- 1)
 			if err != nil {
 				return nil, errors.New(fmt.Sprint("No instances available to extend tree for feature", dtree.featureName, "with value", k, "this shouldn't be possible"))
 			}

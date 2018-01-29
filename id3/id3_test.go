@@ -3,10 +3,12 @@ package id3
 import (
 	"encoding/csv"
 	"fmt"
+	"math/rand"
 	"os"
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 )
 
 func btoFeature(f bool) Feature {
@@ -166,10 +168,14 @@ func TestMushroomEdibility(t *testing.T) {
 		t.Error(err)
 		return
 	} else {
-		defer file.Close()
+		file.Close()
 	}
-	ds := ClassifiedDataSet{make([]*Instance, 0, len(rows))}
-	for _, row := range rows {
+	shuffle(rows)
+	trainSize := int(float64(len(rows)) * 0.8)
+	testSize := len(rows) - trainSize
+	trainDataset := ClassifiedDataSet{make([]*Instance, 0, trainSize)}
+	testDataset := ClassifiedDataSet{make([]*Instance, 0, testSize)}
+	for r, row := range rows {
 		inst := &Instance{}
 		if row[0] == "p" {
 			inst.TargetValue = false
@@ -195,16 +201,27 @@ func TestMushroomEdibility(t *testing.T) {
 			if len(inst.FeatureValues) != 22 {
 				panic("wrong feature length")
 			}
-			ds.Instances = append(ds.Instances, inst)
+			if r < trainSize {
+				trainDataset.Instances = append(trainDataset.Instances, inst)
+			} else {
+				testDataset.Instances = append(testDataset.Instances, inst)
+			}
 		}
 	}
-	dtree, err := Train(ds, BestFeatureInformationGain)
+	dtree, err := Train(trainDataset, BestFeatureInformationGain)
 	if err != nil {
 		t.Error(err)
 	} else {
 		for _, pathway := range dtree.String() {
 			fmt.Println(pathway)
 		}
-		fmt.Println(dtree.CalculateError(ds))
+		fmt.Println(dtree.CalculateError(testDataset))
+	}
+}
+
+func shuffle(rows [][]string) {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for a, b := range rng.Perm(len(rows)) {
+		rows[a], rows[b] = rows[b], rows[a]
 	}
 }
