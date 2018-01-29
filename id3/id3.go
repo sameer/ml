@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 	"sort"
 )
 
@@ -96,7 +95,6 @@ func (i *Instance) Clone() *Instance {
 // One BestFeatureFunc using information gain is provided.
 type BestFeatureFunc func(ds ClassifiedDataSet) string
 
-
 // Using a classified set of data and the provided BestFeatureFunc, the ID3 algorithm is run to train and return
 // a decision tree.
 func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
@@ -108,7 +106,11 @@ func BoundedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations uint) (*D
 	dtree := &Decision{}
 	if ds.Instances == nil || len(ds.Instances) == 0 {
 		return nil, errors.New("No instances provided")
-	} else if dtree.featureName = bf(ds); iterations == 0 || dtree.featureName == "" { // No features left
+	} else if dtree.featureName = bf(ds); dtree.featureName == "" { // No features left
+		dtree.outputValue, dtree.isOutput = mostPopularTarget(ds.Instances), true
+		return dtree, nil
+	} else if iterations == 0 {
+		dtree.featureName = ""
 		dtree.outputValue, dtree.isOutput = mostPopularTarget(ds.Instances), true
 		return dtree, nil
 	} else if instancesIdentical(ds.Instances) {
@@ -130,7 +132,7 @@ func BoundedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations uint) (*D
 		}
 		for k, v := range bestFeatureValToInstances {
 			var err error
-			dtree.nextDecisions[k], err = BoundedTrain(ClassifiedDataSet{Instances: v}, bf, iterations- 1)
+			dtree.nextDecisions[k], err = BoundedTrain(ClassifiedDataSet{Instances: v}, bf, iterations-1)
 			if err != nil {
 				return nil, errors.New(fmt.Sprint("No instances available to extend tree for feature", dtree.featureName, "with value", k, "this shouldn't be possible"))
 			}
@@ -172,7 +174,7 @@ func (dtree *Decision) Classify(inst *Instance) error {
 
 func instancesIdentical(insts []*Instance) bool {
 	for i := 1; i < len(insts); i++ {
-		if !reflect.DeepEqual(*insts[i], *insts[i-1]) {
+		if insts[i].TargetValue != insts[i-1].TargetValue {
 			return false
 		}
 	}
