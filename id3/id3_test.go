@@ -1,7 +1,9 @@
 package id3
 
 import (
+	"encoding/csv"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -120,5 +122,87 @@ func TestTennis(t *testing.T) {
 		t.Error("Encountered tree training error", err)
 	} else if treeStr := dtree.String(); !reflect.DeepEqual(treeStr, expectedTree) {
 		t.Errorf("Expected %#v got %#v\n", expectedTree, treeStr)
+	}
+}
+
+func TestMushroomEdibility(t *testing.T) {
+	file, err := os.Open("agaricus-lepiota.data")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	indexToFeatureName := []string{
+		"",
+		"cap-shape",
+		"cap-surface",
+		"cap-color",
+		"bruises?",
+		"odor",
+		"gill-attachment",
+		"gill-spacing",
+		"gill-size",
+		"gill-color",
+		"stalk-shape",
+		"stalk-root",
+		"stalk-surface-above-ring",
+		"stalk-surface-below-ring",
+		"stalk-color-above-ring",
+		"stalk-color-below-ring",
+		"veil-type",
+		"veil-color",
+		"ring-number",
+		"ring-type",
+		"spore-print-color",
+		"population",
+		"habitat",
+	}
+	featureNameToFeatureValues := map[string]map[string]Feature{}
+	for _, feature := range indexToFeatureName {
+		featureNameToFeatureValues[feature] = make(map[string]Feature)
+	}
+	r := csv.NewReader(file)
+	rows, err := r.ReadAll()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	ds := ClassifiedDataSet{make([]*Instance, 0, len(rows))}
+	for _, row := range rows {
+		inst := &Instance{}
+		if row[0] == "p" {
+			inst.TargetValue = false
+		} else if row[0] == "e" {
+			inst.TargetValue = true
+		} else {
+			t.Error("Invalid value in row")
+		}
+		inst.FeatureValues = make(map[string]Feature)
+		for i := 1; i < len(row); i++ {
+			if row[i] == "?" {
+				inst = nil
+				break
+			}
+			featureName := indexToFeatureName[i]
+			featureValue, ok := featureNameToFeatureValues[featureName][row[i]]
+			if !ok {
+				featureNameToFeatureValues[featureName][row[i]] = Feature(len(featureNameToFeatureValues[featureName]))
+			}
+			inst.FeatureValues[featureName] = featureValue
+		}
+		if inst != nil {
+			if len(inst.FeatureValues) != 22 {
+				panic("wrong feature length")
+			}
+			ds.Instances = append(ds.Instances, inst)
+		}
+	}
+	dtree, err := Train(ds, BestFeatureInformationGain)
+	if err != nil {
+		t.Error(err)
+	} else {
+		for _, pathway := range dtree.String() {
+			fmt.Println(pathway)
+		}
+		fmt.Println(dtree.CalculateError(ds))
 	}
 }

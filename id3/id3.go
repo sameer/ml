@@ -13,7 +13,6 @@ import (
 // being used and the child Decisions.
 // if it is an output node, it keeps track of its output value.
 type Decision struct {
-
 	nextDecisions map[Feature]*Decision
 	featureName   string
 	isOutput      bool
@@ -67,7 +66,6 @@ func (dtree *Decision) string(parents []*Decision) []string {
 // in the provided dataset
 type Feature uint8
 
-
 // The type used for decision tree targets, or outputs.
 type Target bool
 
@@ -81,6 +79,18 @@ type ClassifiedDataSet struct {
 type Instance struct {
 	FeatureValues map[string]Feature
 	TargetValue   Target
+}
+
+
+// Creates a duplicate or clone of an instance.
+func (i *Instance) Clone() *Instance {
+	clone := &Instance{}
+	clone.TargetValue = i.TargetValue
+	clone.FeatureValues = make(map[string]Feature)
+	for k,v := range i.FeatureValues {
+		clone.FeatureValues[k] = v
+	}
+	return clone
 }
 
 // A type of function that selects the best feature for the decision tree to build upon.
@@ -109,8 +119,9 @@ func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
 			}
 			bestFeatureValToInstances[inst.FeatureValues[dtree.featureName]] = append(instances, inst)
 		}
-		for _, inst := range ds.Instances {
-			delete(inst.FeatureValues, dtree.featureName)
+		ds = ClassifiedDataSet{append([]*Instance{}, ds.Instances...)}
+		for i, _ := range ds.Instances {
+			ds.Instances[i] = ds.Instances[i].Clone()
 		}
 		for k, v := range bestFeatureValToInstances {
 			var err error
@@ -123,10 +134,9 @@ func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
 	}
 }
 
-
 // Calculates the error the provided decision tree encounters in classifying the provided pre-classified dataset.
 func (dtree *Decision) CalculateError(ds ClassifiedDataSet) (float64, error) {
-	var wrongClassifications float64 = 0.0
+	wrongClassifications := 0.0
 	for _, inst := range ds.Instances {
 		correctTargetValue := inst.TargetValue
 		if err := dtree.Classify(inst); err != nil {
@@ -151,7 +161,7 @@ func (dtree *Decision) Classify(inst *Instance) error {
 			return errors.New(fmt.Sprint("No decision node corresponding to instance value of", thisValue, "for", dtree.featureName))
 		}
 	} else {
-		return errors.New(fmt.Sprint("No decision node for feature", dtree.featureName))
+		return errors.New(fmt.Sprint("No decision node for feature ", dtree.featureName))
 	}
 }
 
@@ -185,7 +195,7 @@ func mostPopularTarget(insts []*Instance) Target {
 
 // A BestFeature function that uses information gain.
 func BestFeatureInformationGain(ds ClassifiedDataSet) string {
-	var greatestInfoGain float64 = 0.0
+	greatestInfoGain := 0.0
 	greatestFeature := ""
 	for featureName := range ds.Instances[0].FeatureValues {
 		infoGain := infoGainOfFeature(ds, featureName)
@@ -210,7 +220,7 @@ func infoGainOfFeature(ds ClassifiedDataSet, featureName string) float64 {
 		featureValueCounts[inst.FeatureValues[featureName]] = count
 	}
 
-	var infoGain float64 = entropy(ds.Instances)
+	var infoGain = entropy(ds.Instances)
 	for featureValue, featureCount := range featureValueCounts {
 		featureValueEntropy := entropy(filter(ds.Instances, func(inst *Instance) bool {
 			return inst.FeatureValues[featureName] == featureValue
@@ -241,7 +251,7 @@ func entropy(insts []*Instance) float64 {
 		count++
 		targetCounts[inst.TargetValue] = count
 	}
-	var H float64 = 0.0
+	H := 0.0
 	for _, count := range targetCounts {
 		pI := float64(count) / float64(len(insts))
 		H += pI * math.Log2(pI)
