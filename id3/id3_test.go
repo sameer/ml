@@ -165,6 +165,8 @@ func TestMushroomEdibility(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 		return
+	} else {
+		defer file.Close()
 	}
 	ds := ClassifiedDataSet{make([]*Instance, 0, len(rows))}
 	for _, row := range rows {
