@@ -100,30 +100,30 @@ type BestFeatureFunc func(ds ClassifiedDataSet) string
 // a decision tree.
 func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
 	// Infinitely bounded trainng
-	return LimitedTrain(ds, bf, ^uint(0))
+	return LimitedTrain(ds, bf, int((^uint(0)) >> 1))
 }
 
 // Allows for training with a specified maximum number of iterations
-func LimitedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations uint) (*Decision, error) {
+func LimitedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations int) (*Decision, error) {
 	return limitedTrain(ds, bf, &iterations)
 }
 
-func limitedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations *uint) (*Decision, error) {
+func limitedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations *int) (*Decision, error) {
 	dtree := &Decision{} // The decision tree node to return
 	if ds.Instances == nil || len(ds.Instances) == 0 { // Can't train with no data
 		return nil, errors.New("no instances provided")
+	} else if *iterations <= 0 { // Iteration bound has been reached
+		dtree.outputValue, dtree.isOutput, dtree.featureName = mostPopularTarget(ds.Instances), true, ""
+		return dtree, nil
 	} else if dtree.featureName = bf(ds); dtree.featureName == "" { // No features left
 		dtree.outputValue, dtree.isOutput = mostPopularTarget(ds.Instances), true
-		return dtree, nil
-	} else if *iterations == 0 { // Depth bound has been reached
-		dtree.outputValue, dtree.isOutput, dtree.featureName = mostPopularTarget(ds.Instances), true, ""
 		return dtree, nil
 	} else if instancesIdentical(ds.Instances) { // All instances are the same
 		dtree.outputValue, dtree.isOutput = ds.Instances[0].TargetValue, true
 		return dtree, nil
 	} else { // Make a decision node that will have children
-
-		// Sort instances into buckets of feature value
+		*iterations -= 1 // This node
+		// Sort instances into buckets by feature value
 		bestFeatureValToInstances := make(map[Feature][]*Instance, len(ds.Instances))
 		for _, inst := range ds.Instances {
 			instances, ok := bestFeatureValToInstances[inst.FeatureValues[dtree.featureName]]
@@ -142,9 +142,9 @@ func limitedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations *uint) (*
 
 		// Create subdecisions
 		dtree.nextDecisions = make(map[Feature]*Decision, len(bestFeatureValToInstances))
+		*iterations -= len(bestFeatureValToInstances) // Anticipated nodes
 		for k, v := range bestFeatureValToInstances {
 			var err error
-			*iterations -= 1
 			dtree.nextDecisions[k], err = limitedTrain(ClassifiedDataSet{Instances: v}, bf, iterations)
 			if err != nil {
 				return nil, errors.New(fmt.Sprint("no instances available to extend tree for feature", dtree.featureName, "with value", k, "this shouldn't be possible"))

@@ -2,13 +2,13 @@ package id3
 
 import (
 	"encoding/csv"
-	"fmt"
 	"math/rand"
 	"os"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+	"fmt"
 )
 
 func btoFeature(f bool) Feature {
@@ -128,11 +128,6 @@ func TestTennis(t *testing.T) {
 }
 
 func TestMushroomEdibility(t *testing.T) {
-	file, err := os.Open("agaricus-lepiota.data")
-	if err != nil {
-		t.Error(err)
-		return
-	}
 	indexToFeatureName := []string{
 		"",
 		"cap-shape",
@@ -162,60 +157,82 @@ func TestMushroomEdibility(t *testing.T) {
 	for _, feature := range indexToFeatureName {
 		featureNameToFeatureValues[feature] = make(map[string]Feature)
 	}
-	r := csv.NewReader(file)
-	rows, err := r.ReadAll()
-	if err != nil {
-		t.Error(err)
-		return
-	} else {
+
+	makeDataSet := func(file *os.File) (ClassifiedDataSet, [][]string) {
+		r := csv.NewReader(file)
+		rows, err := r.ReadAll()
 		file.Close()
-	}
-	shuffle(rows)
-	trainSize := int(float64(len(rows)) * 0.8)
-	testSize := len(rows) - trainSize
-	trainDataset := ClassifiedDataSet{make([]*Instance, 0, trainSize)}
-	testDataset := ClassifiedDataSet{make([]*Instance, 0, testSize)}
-	for r, row := range rows {
-		inst := &Instance{}
-		if row[0] == "p" {
-			inst.TargetValue = false
-		} else if row[0] == "e" {
-			inst.TargetValue = true
-		} else {
-			t.Error("Invalid value in row")
+		if err != nil {
+			t.Error(err)
 		}
-		inst.FeatureValues = make(map[string]Feature)
-		for i := 1; i < len(row); i++ {
-			if row[i] == "?" {
-				inst = nil
-				break
-			}
-			featureName := indexToFeatureName[i]
-			featureValue, ok := featureNameToFeatureValues[featureName][row[i]]
-			if !ok {
-				featureNameToFeatureValues[featureName][row[i]] = Feature(len(featureNameToFeatureValues[featureName]))
-			}
-			inst.FeatureValues[featureName] = featureValue
-		}
-		if inst != nil {
-			if len(inst.FeatureValues) != 22 {
-				panic("wrong feature length")
-			}
-			if r < trainSize {
-				trainDataset.Instances = append(trainDataset.Instances, inst)
+		ds := ClassifiedDataSet{}
+		var dsRecords [][]string
+		for _, row := range rows {
+			inst := &Instance{}
+			if row[0] == "p" {
+				inst.TargetValue = false
+			} else if row[0] == "e" {
+				inst.TargetValue = true
 			} else {
-				testDataset.Instances = append(testDataset.Instances, inst)
+				t.Error("Invalid value in row")
+			}
+			inst.FeatureValues = make(map[string]Feature)
+			for i := 1; i < len(row); i++ {
+				if row[i] == "?" {
+					inst = nil
+					break
+				}
+				featureName := indexToFeatureName[i]
+				featureValue, ok := featureNameToFeatureValues[featureName][row[i]]
+				if !ok {
+					featureNameToFeatureValues[featureName][row[i]] = Feature(len(featureNameToFeatureValues[featureName]))
+				}
+				inst.FeatureValues[featureName] = featureValue
+			}
+			if inst != nil {
+				if len(inst.FeatureValues) != 22 {
+					panic("wrong feature length")
+				}
+				ds.Instances = append(ds.Instances, inst)
+				dsRecords = append(dsRecords, row)
 			}
 		}
+		return ds, dsRecords
 	}
-	dtree, err := Train(trainDataset, BestFeatureInformationGain)
-	if err != nil {
-		t.Error(err)
-	} else {
-		for _, pathway := range dtree.String() {
-			fmt.Println(pathway)
+	for v := 0; v < 1; v++ {
+		trainIn, _ := os.Open("train.data")
+		testIn, _ := os.Open("test.data")
+		validateIn, _ := os.Open("validate.data")
+		trainDataSet, _ := makeDataSet(trainIn)
+		testDataSet, _ := makeDataSet(testIn)
+		validateDataSet, _ := makeDataSet(validateIn)
+
+		for i := 0; i < 50; i++ {
+			dtree, err := LimitedTrain(trainDataSet, BestFeatureInformationGain, i)
+			if err != nil {
+				t.Error(err)
+			} else {
+				for rep := 0; rep < 2; rep++ {
+					if rep == 1 {
+						dtree.ReducedErrorPrune(validateDataSet)
+					}
+					trainError, err := dtree.CalculateError(trainDataSet)
+					testError, err := dtree.CalculateError(testDataSet)
+					validateError, err := dtree.CalculateError(validateDataSet)
+					if err != nil {
+						t.Error(err)
+					}
+					fmt.Print(i, ",", trainError, ",", validateError, ",", testError)
+					//fmt.Print(i, ",", trainError, ",", testError)
+					if rep == 0 {
+						fmt.Print(",")
+						//fmt.Println()
+					} else {
+						fmt.Println()
+					}
+				}
+			}
 		}
-		fmt.Println(dtree.CalculateError(testDataset))
 	}
 }
 
