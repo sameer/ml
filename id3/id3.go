@@ -100,18 +100,22 @@ type BestFeatureFunc func(ds ClassifiedDataSet) string
 // a decision tree.
 func Train(ds ClassifiedDataSet, bf BestFeatureFunc) (*Decision, error) {
 	// Infinitely bounded trainng
-	return BoundedTrain(ds, bf, ^uint(0))
+	return LimitedTrain(ds, bf, ^uint(0))
 }
 
 // Allows for training with a specified maximum number of iterations
-func BoundedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations uint) (*Decision, error) {
+func LimitedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations uint) (*Decision, error) {
+	return limitedTrain(ds, bf, &iterations)
+}
+
+func limitedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations *uint) (*Decision, error) {
 	dtree := &Decision{} // The decision tree node to return
 	if ds.Instances == nil || len(ds.Instances) == 0 { // Can't train with no data
 		return nil, errors.New("no instances provided")
 	} else if dtree.featureName = bf(ds); dtree.featureName == "" { // No features left
 		dtree.outputValue, dtree.isOutput = mostPopularTarget(ds.Instances), true
 		return dtree, nil
-	} else if iterations == 0 { // Depth bound has been reached
+	} else if *iterations == 0 { // Depth bound has been reached
 		dtree.outputValue, dtree.isOutput, dtree.featureName = mostPopularTarget(ds.Instances), true, ""
 		return dtree, nil
 	} else if instancesIdentical(ds.Instances) { // All instances are the same
@@ -140,7 +144,8 @@ func BoundedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations uint) (*D
 		dtree.nextDecisions = make(map[Feature]*Decision, len(bestFeatureValToInstances))
 		for k, v := range bestFeatureValToInstances {
 			var err error
-			dtree.nextDecisions[k], err = BoundedTrain(ClassifiedDataSet{Instances: v}, bf, iterations-1)
+			*iterations -= 1
+			dtree.nextDecisions[k], err = limitedTrain(ClassifiedDataSet{Instances: v}, bf, iterations)
 			if err != nil {
 				return nil, errors.New(fmt.Sprint("no instances available to extend tree for feature", dtree.featureName, "with value", k, "this shouldn't be possible"))
 			}
@@ -153,10 +158,11 @@ func BoundedTrain(ds ClassifiedDataSet, bf BestFeatureFunc, iterations uint) (*D
 // to prune with.
 func (thisTree *Decision) ReducedErrorPrune(validate ClassifiedDataSet) error {
 	// Use a stack of Decision nodes and applicable subset of the ClassifiedDataSet
-	for treeStack, dsStack := []*Decision{thisTree}, [][]*Instance{validate.Instances}; len(treeStack) > 0; {
+	treeStack, dsStack := []*Decision{thisTree}, [][]*Instance{validate.Instances};
+	for ; len(treeStack) > 0; {
 		// Pop from the stack
-		curTree, treeStack := treeStack[len(treeStack)-1], treeStack[:len(treeStack)-1]
-		curDS, dsStack := dsStack[len(dsStack)-1], dsStack[:len(dsStack)-1]
+		curTree, curDS := treeStack[len(treeStack)-1], dsStack[len(dsStack)-1]
+		treeStack, dsStack = treeStack[:len(treeStack)-1], dsStack[:len(dsStack)-1]
 
 		if curTree.isOutput { // Output nodes have no children, there's no point
 			continue
